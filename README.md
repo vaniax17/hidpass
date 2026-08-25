@@ -26,8 +26,16 @@ unknown devices remain `other-hid` and are confirmed interactively.
 `TAG+="uaccess"` is interpreted by systemd-logind for the active local seat. It
 is safer than global mode bits but is not intended for headless/non-seat users.
 Reload/trigger does not reliably recalculate ACLs for every existing node, so a
-physical reconnect can still be required. Bluetooth hidraw devices lack USB
-VID/PID ancestry and are not targeted by this MVP.
+physical reconnect can still be required. `remove` is affected the same way in
+the opposite direction: udev re-applies `uaccess` but never revokes it, so an
+already-granted node keeps its ACL until it is reconnected.
+
+Bluetooth hidraw devices are skipped. They are not simply absent from sysfs:
+udev's hidraw rules import `usb_id` whenever any ancestor is USB, so a device
+paired to a USB dongle reports `ID_BUS=usb` and the *dongle's* VID:PID. A rule
+for that ID would cover every device behind the same adapter, so the transport
+is read from the HID device directory name (`BUS:VID:PID.INSTANCE`, `0003` is
+USB) and anything else is reported as a diagnostic instead.
 
 Sensitive authenticators and hardware wallets (YubiKey/FIDO, Ledger, Trezor,
 Nitrokey, etc.) are excluded by `auto`, including `auto --yes`. An informed
@@ -85,7 +93,7 @@ at `/etc/udev/rules.d/70-hidpass.rules`, followed by:
 
 ```text
 udevadm control --reload-rules
-udevadm trigger
+udevadm trigger --subsystem-match=hidraw
 ```
 
 ## Security boundary
